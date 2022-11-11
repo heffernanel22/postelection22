@@ -1,0 +1,79 @@
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,include=FALSE}
+#Loading in the dataframes and packages we need. 
+#Packages
+library(tidyverse)
+library(readr)
+library(lubridate)
+library(censusapi)
+library(tidycensus)
+library(leaflet)
+library(stringr)
+library(tigris)
+library(readr)
+library(sf)
+library(leaflegend)
+library(x12)
+
+#Dataframes
+comparing_female_voter_turnout_2018_2022 <- read_csv("comparing_female_voter_turnout_2018_2022.csv", 
+    col_types = cols(pct_change_since_2018 = col_number()))
+View(comparing_female_voter_turnout_2018_2022) 
+comparing_youth_voter_turnout_2018_2022 <- read_csv("comparing_youth_voter_turnout_2018_2022.csv", 
+    col_types = cols(`decrease in youth voter turnout_adjusted` = col_number()))
+
+comparing_youth_voter_turnout_2018_2022$`decrease in youth voter turnout_adjusted` <- round(comparing_youth_voter_turnout_2018_2022$`decrease in youth voter turnout_adjusted`)
+
+#Making a shapefile of West Virginia counties 
+
+wv_counties <- counties(state = "WV",year = "2019",cb = T)
+wv_counties <-wv_counties %>% rename(county = NAME)
+wv_counties <- wv_counties %>% st_transform('+proj=longlat +datum=WGS84')
+
+#Cleaning some names that will make joining easier later 
+wv_counties$county <-toupper(wv_counties$county)
+wv_counties <- wv_counties %>% rename(County = county)
+
+#Getting rid of counties that had turnout increases:
+comparing_female_voter_turnout_2018_2022 <-comparing_female_voter_turnout_2018_2022 %>% filter(pct_change_since_2018>0)
+
+#Combining  dataframes & cleaning things up for our map
+
+gender_election_map <- left_join(wv_counties,comparing_female_voter_turnout_2018_2022)%>% filter(pct_change_since_2018>0)
+youth_election_map <- left_join(wv_counties,comparing_youth_voter_turnout_2018_2022)
+
+
+#Making an interactive map
+#Creating palettes
+pal1 <-colorQuantile(c("skyblue","#1A3C6C"),domain = gender_election_map $ppe,n=5,na.color = "white")
+numericPal <- colorNumeric(c("skyblue","#1A3C6C"),gender_election_map$pct_change_since_2018)
+                          
+#Creating a hover effect
+labels <- sprintf("<strong>%s:</strong><br/>%s percent decrease",as.character(gender_election_map$County),as.character(gender_election_map$pct_change_since_2018),
+as.character(gender_election_map$pct_change_since_2018)) %>% lapply(htmltools::HTML)
+
+#Creating the map 
+wv_interactive_gender_election_map <- leaflet() %>% addProviderTiles("CartoDB.PositronNoLabels") %>% setView(-79.20,38.90,zoom =5.5) %>% addPolygons(data = gender_election_map,fillColor =~pal1(gender_election_map$pct_change_since_2018),fillOpacity = 10,color = "white",weight = .6,highlightOptions = highlightOptions(
+    weight = 3,
+    color = "#FFFFFF",
+    fillOpacity = 0.7,
+    bringToFront = TRUE),label = labels,
+  labelOptions = labelOptions(
+    style = list("font-weight" = "normal", padding = "3px 8px"),
+    textsize = "15px")) %>% addLegendNumeric(pal = numericPal, values = gender_election_map$pct_change_since_2018, title = 'Percent decrease in turnout',
+                   orientation = 'vertical', fillOpacity = .7, width = 20,
+                   height = 200, position ='topright') 
+```
+
+
+
+```{r,message=FALSE,echo=FALSE,warning=FALSE}
+#Checking if it worked
+wv_interactive_gender_election_map
+
+```
+
+
+
+
+

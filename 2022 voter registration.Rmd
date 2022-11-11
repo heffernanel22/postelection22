@@ -1,0 +1,94 @@
+---
+title: "voter registration 2018 and 2022"
+output: html_document
+date: "2022-11-10"
+---
+#Load in the dataframes & rename them  
+```{r}
+library(tidyverse)
+library(lubridate)
+library(readr)
+library(stringr)
+
+voter_registration_2022 <-StateVR101822 <- read_delim("StateVR101822.txt", 
+    delim = "|", escape_double = FALSE, trim_ws = TRUE)
+
+voter_registration_2018 <- read_delim("tester.txt", delim = "|", 
+    escape_double = FALSE, trim_ws = TRUE)
+View(tester)
+
+```
+
+#Cleaning up the birthday column because good lord 
+```{r}
+
+#Pulling out the year and month of birth
+voter_registration_2022 <-voter_registration_2022 %>% mutate(year_of_birth = str_sub(voter_registration_2022$`DATE OF BIRTH`,-12,-9),extra_months = str_sub(voter_registration_2022$`DATE OF BIRTH`,1,1))
+
+#Making sure the computer knows they're numbers,so we can do some math 
+voter_registration_2022$extra_months <-as.numeric(voter_registration_2022$extra_months)
+voter_registration_2022$year_of_birth <-as.numeric(voter_registration_2022$year_of_birth)
+
+#Doing math, so we don't count someone in the wrong age bracket by a couple of months. 
+voter_registration_2022 <- voter_registration_2022 %>% mutate(extra_months_converted = extra_months/12)
+
+voter_registration_2022 <- voter_registration_2022 %>% mutate(year_and_month_converted = year_of_birth+extra_months_converted)
+
+#Rigamoroling this backwards to find age
+voter_registration_2022 <- voter_registration_2022 %>% mutate(age = 2022.91 - year_and_month_converted)
+
+
+```
+
+#Making a dataframe that shows us how many voters are registered each county, split by age brackets These are raw numbers, not adjusted for registration totals. 
+```{r}
+#First, we make individual dataframes for each age bracket. 
+a <- voter_registration_2022 %>% filter(age>= 18,`age`<=24.999) %>% mutate(age_bracket = "18 to 24")
+b <- voter_registration_2022 %>% filter(`age`>= 25,`age`<=34.999) %>% mutate(age_bracket = "25 to 34")
+c <- voter_registration_2022 %>% filter(`age`>= 35,`age`<=44.999) %>% mutate(age_bracket = "35 to 44")
+d <- voter_registration_2022  %>% filter(`age`>= 45,`age`<=54.999) %>% mutate(age_bracket = "45 to 54")
+e <- voter_registration_2022 %>% filter(`age`>= 55,`age`<=64.9999) %>% mutate(age_bracket = "55 to 64")
+f <- voter_registration_2022 %>% filter(`age`>= 65,`age`<=74.9999) %>% mutate(age_bracket = "65 to 74")
+g <- voter_registration_2022 %>% filter(`age`>= 75) %>% mutate(age_bracket = "75 and up ")
+
+#And now we recombine the dataframe, with every voter classified into an age bracket, according to age.
+voter_registration_2022_turnout_grouped <- union_all(a,b)
+voter_registration_2022_turnout_grouped  <- union_all(voter_registration_2022_turnout_grouped,c)
+voter_registration_2022_turnout_grouped  <- union_all(voter_registration_2022_turnout_grouped ,d)
+voter_registration_2022_turnout_grouped  <- union_all(voter_registration_2022_turnout_grouped ,e)
+voter_registration_2022_turnout_grouped  <- union_all(voter_registration_2022_turnout_grouped ,f)
+voter_registration_2022_turnout_grouped  <- union_all(voter_registration_2022_turnout_grouped ,g)
+
+```
+
+
+#Now let's make a dataframe that showsus how many folks were registered in each county, split by age bracket. 
+```{r}
+voter_registration_2022_turnout_grouped <-voter_registration_2022_turnout_grouped %>% group_by(COUNTY_NAME,age_bracket) %>% summarise(`DATE OF BIRTH` = n()) %>% pivot_wider(names_from = age_bracket, values_from = `DATE OF BIRTH`) 
+
+
+write.csv(voter_registration_2022_turnout_grouped ,"voter_registration_split_by_age_and_county_22.csv")
+```
+
+#Making a dataframe that shows us how many folks were registered in each county, split by gender.
+```{r}
+voter_registration_2022 <- tibble::rowid_to_column(voter_registration_2022,"ID")
+voter_registration_2022 %>% group_by(COUNTY_NAME,SEX) %>% summarise(ID = n()) %>% pivot_wider(names_from = SEX, values_from = ID) %>% mutate(Unsure = Unknown+`NA`) 
+
+
+#write.csv(voter_registration_split_by_gender_and_county_22,"voter_registration_split_by_gender_and_county_22.csv")
+
+```
+
+#Making a dataframe showing how many voters were registered in each county
+```{r}
+total_turnout_by_county_2022 <- voter_registration_2022 %>% group_by(COUNTY_NAME) %>% summarise(ID = n()) 
+
+
+write.csv(total_turnout_by_county_2022,"total_turnout_by_county.csv")
+
+```
+
+
+
+

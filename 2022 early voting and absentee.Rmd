@@ -1,0 +1,86 @@
+---
+title: "assessing early & absentee 2022"
+output: html_document
+date: "2022-11-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Loading the packages & dataframes we need. 
+```{r}
+library(readr)
+library(tidyverse)
+absentee_gender_22 <- read_csv("absentee_gender_22.csv") 
+absentee_ages_22 <- read_csv("absentee_ages_22.csv")
+ev_gender_22 <- read_csv("ev_gender_22.csv") 
+ev_ages_22 <- read_csv("ev_ages_22.csv")
+
+```
+
+
+#Combining early voting & absentee
+```{r}
+gender_and_county_22 <- union_all(absentee_gender_22,ev_gender_22)
+age_and_county_22 <- union_all(absentee_ages_22,ev_ages_22)
+
+
+```
+
+#Making a dataframe that shows us how many early voting and absentee ballots were cast in each county, split by gender. These are raw numbers, not adjusted for registration totals. 
+```{r}
+gender_and_county_22 <- tibble::rowid_to_column(gender_and_county_22,"ID")
+gender_and_county_22 <- gender_and_county_22 %>% group_by(County,`Voter Gender`) %>% summarise(ID = n()) %>% pivot_wider(names_from = `Voter Gender`, values_from = ID) 
+
+absentee_and_early_voting_split_by_gender_and_county_22 <- gender_and_county_22
+
+write.csv(absentee_and_early_voting_split_by_gender_and_county_22,"absentee_and_early_voting_split_by_gender_and_county_22.csv")
+```
+
+#Making a dataframe that shows us how many early voting and absentee ballots were cast in each county, split by age brackets These are raw numbers, not adjusted for registration totals. 
+```{r}
+#First, we make individual dataframes for each age bracket. 
+a <- age_and_county_22 %>% filter(`Voter Age`>= 18,`Voter Age`<=24.999) %>% mutate(age_bracket = "18 to 24")
+b <- age_and_county_22%>% filter(`Voter Age`>= 25,`Voter Age`<=34.999) %>% mutate(age_bracket = "25 to 34")
+c <- age_and_county_22%>% filter(`Voter Age`>= 35,`Voter Age`<=44.999) %>% mutate(age_bracket = "35 to 44")
+d <- age_and_county_22 %>% filter(`Voter Age`>= 45,`Voter Age`<=54.999) %>% mutate(age_bracket = "45 to 54")
+e <- age_and_county_22 %>% filter(`Voter Age`>= 55,`Voter Age`<=64.9999) %>% mutate(age_bracket = "55 to 64")
+f <- age_and_county_22%>% filter(`Voter Age`>= 65,`Voter Age`<=74.9999) %>% mutate(age_bracket = "65 to 74")
+g <- age_and_county_22 %>% filter(`Voter Age`>= 75) %>% mutate(age_bracket = "75 and up ")
+
+#And now we recombine the dataframe, with every voter classified into an age bracket, according to age.
+age_and_county_22_grouped <- union_all(a,b)
+age_and_county_22_grouped  <- union_all(age_and_county_22_grouped,c)
+age_and_county_22_grouped  <- union_all(age_and_county_22_grouped ,d)
+age_and_county_22_grouped  <- union_all(age_and_county_22_grouped ,e)
+age_and_county_22_grouped  <- union_all(age_and_county_22_grouped ,f)
+age_and_county_22_grouped  <- union_all(age_and_county_22_grouped ,g)
+
+```
+
+#Now let's make a dataframe that shows us how many early voting and absentee ballots were cast in each county, split by age bracket. These are raw numbers, not adjusted for registration totals. 
+```{r}
+
+absentee_and_early_voting_split_by_age_and_county_22 <-age_and_county_22_grouped %>% group_by(County,age_bracket) %>% summarise(`Voter Age` = n()) %>% pivot_wider(names_from = age_bracket, values_from = `Voter Age`) 
+
+write.csv(absentee_and_early_voting_split_by_age_and_county_22,"absentee_and_early_voting_split_by_age_and_county_22.csv")
+```
+
+#Now let's make a dataframe that shows us how many early voting and absentee ballots were cast in each county,total.
+```{r}
+
+ballots_cast_by_county_22 <-gender_and_county_22 %>% group_by(County) %>% summarise(ID = n()) 
+
+
+gender_and_county_22 <- tibble::rowid_to_column(gender_and_county_22,"ID")
+gender_and_county_22 <- gender_and_county_22 %>% group_by(County,`Voter Gender`) %>% summarise(ID = n()) %>% pivot_wider(names_from = `Voter Gender`, values_from = ID) 
+
+absentee_and_early_voting_split_by_gender_and_county_22 <- gender_and_county_22
+
+write.csv(ballots_cast_by_county_22,"ballots_cast_by_county_22.csv")
+
+```
+
+
+
